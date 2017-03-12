@@ -10,14 +10,12 @@ import urllib.request as ur
 import PIL.Image as pil
 import io
 
-
 headers = {'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.76 Safari/537.36'}
 
 google_url="http://mt2.google.cn/vt/lyrs={style}&hl=zh-CN&gl=CN&src=app&x={x}&y={y}&z={z}"
 amap_url="http://wprd02.is.autonavi.com/appmaptile?style={style}&x={x}&y={y}&z={z}"
 
 
-# 暂时无用
 #WGS-84经纬度转Web墨卡托
 def wgs2macator(x,y):
     y = 85.0511287798 if y > 85.0511287798 else y
@@ -28,7 +26,6 @@ def wgs2macator(x,y):
     y2 = y2*20037508.34/180
     return x2, y2
 
-#暂时无用
 #Web墨卡托转经纬度
 def mecator2wgs(x,y):
     x2 = x / 20037508.34 * 180
@@ -72,6 +69,37 @@ def getpos(j,w,z):
     return x,y
 
 
+#根据瓦片坐标范围，获得该区域四个角的web墨卡托投影坐标
+def getframeM(inx,iny,inx2,iny2,z):
+    length = 20037508.3427892
+    sum=2**z
+    LTx=inx / sum*length*2 - length
+    LTy= -(iny / sum*length*2) + length
+
+    RBx=(inx2+1) / sum*length*2 - length
+    RBy= -((iny2+1) / sum*length*2) + length
+
+    #LT=left top,RB=right buttom
+    #返回四个角的投影坐标
+    res={'LT':(LTx,LTy),'RB':(RBx,RBy),'LB':(LTx,RBy),'RT':(RBx,LTy)}
+    return res
+
+#根据瓦片坐标范围，获得该区域四个角的地理经纬度坐标
+def getframeW(inx,iny,inx2,iny2,z):
+    zb=getframeM(inx,iny,inx2,iny2,z)
+    for index,xy in zb.items():
+        zb[index]=mecator2wgs(*xy)
+    #返回四个角的经纬度坐标
+    return zb
+
+def printzb(zb):
+    print("左上：({0:.7f},{1:.7f})".format(*zb['LT']))
+    print("右上：({0:.7f},{1:.7f})".format(*zb['RT']))
+    print("左下：({0:.7f},{1:.7f})".format(*zb['LB']))
+    print("右下：({0:.7f},{1:.7f})".format(*zb['RB']))
+
+
+
 # 根据瓦片坐标获取图像数据
 def getdata(x,y,z,source,style='s'):
     '''
@@ -112,6 +140,7 @@ def getpic(x1,y1,x2,y2,z,source='google',outfile="MAP_OUT.png",style='s'):
     '''
     pos1x, pos1y = getpos(x1, y1, z)
     pos2x, pos2y = getpos(x2, y2, z)
+    frame=getframeW(pos1x,pos1y,pos2x,pos2y,z)
     lenx = pos2x - pos1x + 1
     leny = pos2y - pos1y + 1
     print("总数量：{x} X {y}".format(x=lenx,y=leny))
@@ -135,7 +164,8 @@ def getpic(x1,y1,x2,y2,z,source='google',outfile="MAP_OUT.png",style='s'):
     print('拼合完成！正在导出...')
 
     outpic.save(outfile)
-    print('导出完成！程序退出...')
+    print('导出完成！')
+    return frame
 
 
 def getpic_s(x,y,z,source='google',outfile="out_single.png",style="s"):
@@ -145,5 +175,8 @@ def getpic_s(x,y,z,source='google',outfile="out_single.png",style="s"):
 
 if __name__ == '__main__':
     #下载西安 青龙寺地块 卫星地图
-    #getpic(108.9797845,34.2356831,108.9949663,34.2275018,18,'amap',outfile="myout.png")
-    getpic(108.9797845,34.2356831,108.9949663,34.2275018,16,'amap',outfile="myout.png")
+    mm=getpic(108.9797845,34.2356831,108.9949663,34.2275018,
+        18,source='amap',style='m',outfile="myouta.png")
+
+    printzb(mm)
+
