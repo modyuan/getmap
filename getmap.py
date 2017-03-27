@@ -1,4 +1,10 @@
-#get google map by coori
+'''
+pygetmap:
+
+Download web map by cooridinates
+
+'''
+
 #Longittude 经度
 #Latitude   纬度
 #Mecator x = y = [-20037508.3427892,20037508.3427892]
@@ -10,10 +16,45 @@ import urllib.request as ur
 import PIL.Image as pil
 import io
 
-headers = {'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.76 Safari/537.36'}
+HEADERS = {'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.76 Safari/537.36'}
 
-google_url="http://mt2.google.cn/vt/lyrs={style}&hl=zh-CN&gl=CN&src=app&x={x}&y={y}&z={z}"
-amap_url="http://wprd02.is.autonavi.com/appmaptile?style={style}&x={x}&y={y}&z={z}"
+
+MAP_URLS={
+"google":"http://mt2.google.cn/vt/lyrs={style}&hl=zh-CN&gl=CN&src=app&x={x}&y={y}&z={z}",
+"amap":"http://wprd02.is.autonavi.com/appmaptile?style={style}&x={x}&y={y}&z={z}",
+"tencent_s":"http://p3.map.gtimg.com/sateTiles/{z}/{fx}/{fy}/{x}_{y}.jpg",
+"tencent_m":"http://rt0.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=3" }
+
+
+def geturl(source,x,y,z,style):
+    '''
+    Get the picture url for download.
+    style:
+        m for map
+        s for satellite
+    source:
+        goole or amap or tencent
+    x y:
+        google-style tile coordinate system
+    z:
+        zoom 
+    '''
+    if source == 'google':
+        furl=MAP_URLS["google"].format(x=x,y=y,z=z,style=style)
+    elif source == 'amap':
+        style=6 if style=='s' else 7   # for amap 6 is satellite and 7 is map.
+        furl=MAP_URLS["amap"].format(x=x,y=y,z=z,style=style)
+    elif source == 'tencent':
+        y=2**z-1-y
+        if style == 's':
+            furl=MAP_URLS["tencent_s"].format(x=x,y=y,z=z,fx=floor(x/16),fy=floor(y/16))
+        else:
+            furl=MAP_URLS["tencent_m"].format(x=x,y=y,z=z)
+    else:
+        raise Exception("Unknown Map Source ! ")
+
+    return furl
+
 
 
 #WGS-84经纬度转Web墨卡托
@@ -34,20 +75,24 @@ def mecator2wgs(x,y):
     return x2,y2
 
 
-
-
 '''
 东经为正，西经为负。北纬为正，南纬为负
 j经度 w纬度 z缩放比例[0-22] ,对于卫星图并不能取到最大，测试值是20最大，再大会返回404.
 '''
 # 根据WGS-84 的经纬度获取谷歌地图中的瓦片坐标
 def getpos(j,w,z):
+    '''
+    Get google-style tile cooridinate from geographical coordinate
+    j : Longittude
+    w : Latitude
+    z : zoom
+    '''
     isnum=lambda x: isinstance(x,int) or isinstance(x,float)
     if not(isnum(j) and isnum(w)):
         raise TypeError("j and w must be int or float!")
         return None
 
-    if not isinstance(z,int) or z<0:
+    if not isinstance(z,int) or z<0 or z>22:
         raise TypeError("z must be int and between 0 to 22.")
         return None
 
@@ -71,6 +116,11 @@ def getpos(j,w,z):
 
 #根据瓦片坐标范围，获得该区域四个角的web墨卡托投影坐标
 def getframeM(inx,iny,inx2,iny2,z):
+    '''
+    Get the frame of region 
+    input lefttop and rightbutton tile cooridinates
+    output WebMecator cooridinates of the frame
+    '''
     length = 20037508.3427892
     sum=2**z
     LTx=inx / sum*length*2 - length
@@ -86,6 +136,11 @@ def getframeM(inx,iny,inx2,iny2,z):
 
 #根据瓦片坐标范围，获得该区域四个角的地理经纬度坐标
 def getframeW(inx,iny,inx2,iny2,z):
+    '''
+    Get the frame of region 
+    input lefttop and rightbutton tile cooridinates
+    output geographical cooridinates of the frame
+    '''
     zb=getframeM(inx,iny,inx2,iny2,z)
     for index,xy in zb.items():
         zb[index]=mecator2wgs(*xy)
@@ -103,27 +158,19 @@ def printzb(zb):
 # 根据瓦片坐标获取图像数据
 def getdata(x,y,z,source,style='s'):
     '''
-    根据瓦片坐标等获取谷歌地图的瓦片的下载地址。
-    x y 瓦片坐标
-    z   缩放级别
+    Get picture data from googlo-style tile cooridinate system
+    x y : 瓦片坐标
+    z   : 缩放级别
     style:
-        s卫星图
-        m路线图
+        s 卫星图
+        m 路线图
     source:
         amap 高德
         google 谷歌
+        tencent 腾讯
     '''
-    if source=="amap":
-        style=style.lower()
-        style=6 if style=='s' else 7
-        source=amap_url
-    elif source == "google":
-        source=google_url
-    else:
-        raise Exception("Unknown Map Source ! ")
-
-    furl=source.format(x=x,y=y,z=z,style=style)
-    req = ur.Request(url=furl, headers=headers) 
+    furl=geturl(source,x,y,z,style)
+    req = ur.Request(url=furl, headers=HEADERS)
     try:
         data=ur.urlopen(req,timeout=5).read()
     except:
@@ -169,14 +216,13 @@ def getpic(x1,y1,x2,y2,z,source='google',outfile="MAP_OUT.png",style='s'):
 
 
 def getpic_s(x,y,z,source='google',outfile="out_single.png",style="s"):
-    #获得单幅瓦片图像
+    '''获得单幅瓦片图像'''
     getpic(x,y,x,y,z,source,outfile,style)
 
 
 if __name__ == '__main__':
     #下载西安 青龙寺地块 卫星地图
     mm=getpic(108.9797845,34.2356831,108.9949663,34.2275018,
-        18,source='amap',style='m',outfile="myouta.png")
-
+        16,source='tencent',style='s',outfile="myout.png")
     printzb(mm)
-
+    
