@@ -14,17 +14,17 @@ Download web map by cooridinates
 from math import floor,pi,log,tan,atan,exp
 import urllib.request as ur
 import PIL.Image as pil
-import io
+import io, asyncio
 
-HEADERS = {'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.76 Safari/537.36'}
-
+HEADERS = 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.76 Safari/537.36'
 
 MAP_URLS={
-"google":"http://mt2.google.cn/vt/lyrs={style}&hl=zh-CN&gl=CN&src=app&x={x}&y={y}&z={z}",
-"amap":"http://wprd02.is.autonavi.com/appmaptile?style={style}&x={x}&y={y}&z={z}",
-"tencent_s":"http://p3.map.gtimg.com/sateTiles/{z}/{fx}/{fy}/{x}_{y}.jpg",
-"tencent_m":"http://rt0.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=3" }
+"google":{"domain":"mt2.google.cn","url":"/vt/lyrs={style}&hl=zh-CN&gl=CN&src=app&x={x}&y={y}&z={z}"},
+"amap":{"domain":"wprd02.is.autonavi.com","url":"/appmaptile?style={style}&x={x}&y={y}&z={z}"},
+"tencent_s":{"domain":"p3.map.gtimg.com","url":"/sateTiles/{z}/{fx}/{fy}/{x}_{y}.jpg"},
+"tencent_m":{"domain":"rt0.map.gtimg.com","url":"/tile?z={z}&x={x}&y={y}&styleid=3" }}
 
+EXIT = False
 
 def geturl(source,x,y,z,style):
     '''
@@ -40,21 +40,31 @@ def geturl(source,x,y,z,style):
         zoom 
     '''
     if source == 'google':
-        furl=MAP_URLS["google"].format(x=x,y=y,z=z,style=style)
+        furl=MAP_URLS["google"]["url"].format(x=x,y=y,z=z,style=style)
     elif source == 'amap':
         style=6 if style=='s' else 7   # for amap 6 is satellite and 7 is map.
-        furl=MAP_URLS["amap"].format(x=x,y=y,z=z,style=style)
+        furl=MAP_URLS["amap"]["url"].format(x=x,y=y,z=z,style=style)
     elif source == 'tencent':
         y=2**z-1-y
         if style == 's':
-            furl=MAP_URLS["tencent_s"].format(x=x,y=y,z=z,fx=floor(x/16),fy=floor(y/16))
+            furl=MAP_URLS["tencent_s"]["url"].format(x=x,y=y,z=z,fx=floor(x/16),fy=floor(y/16))
         else:
-            furl=MAP_URLS["tencent_m"].format(x=x,y=y,z=z)
+            furl=MAP_URLS["tencent_m"]["url"].format(x=x,y=y,z=z)
     else:
         raise Exception("Unknown Map Source ! ")
 
     return furl
 
+def getdomain(source,style):
+    if source == 'tencent':
+        if style == "s":
+            return MAP_URLS["tencent_s"]["domain"]
+        else:
+            return MAP_URLS["tencent_m"]["domain"]
+    elif source == "amap" or source == "google":
+        return MAP_URLS[source]["domain"]
+    else:
+        raise Exception("Unkonwn Map Source ! ")
 
 
 #WGS-84经纬度转Web墨卡托
@@ -148,6 +158,8 @@ def getframeW(inx,iny,inx2,iny2,z):
     return zb
 
 def printzb(zb):
+    if not zb:
+        return
     print("左上：({0:.7f},{1:.7f})".format(*zb['LT']))
     print("右上：({0:.7f},{1:.7f})".format(*zb['RT']))
     print("左下：({0:.7f},{1:.7f})".format(*zb['LB']))
@@ -155,29 +167,45 @@ def printzb(zb):
 
 
 
-# 根据瓦片坐标获取图像数据
-def getdata(x,y,z,source,style='s'):
-    '''
-    Get picture data from googlo-style tile cooridinate system
-    x y : 瓦片坐标
-    z   : 缩放级别
-    style:
-        s 卫星图
-        m 路线图
-    source:
-        amap 高德
-        google 谷歌
-        tencent 腾讯
-    '''
-    furl=geturl(source,x,y,z,style)
-    req = ur.Request(url=furl, headers=HEADERS)
-    try:
-        data=ur.urlopen(req,timeout=5).read()
-    except:
-        print("get picture failed!")
-        print("url:",furl)
-        exit()
-    return data
+async def async_getpic(domain, urls, out_pics, index, multiple):  # 通过协程来下载图像，更具效率
+    length=len(urls)
+    global EXIT
+    for i in range(index,length,multiple):
+        if EXIT:
+            return
+        connect = asyncio.open_connection(host=domain, port=80)
+        try:
+            reader, writer = await connect
+        except:
+            EXIT = True
+            return
+        header = 'GET {url} HTTP/1.0\r\nHost: {domain}\r\n{header}\r\n\r\n'.format(url=urls[i], 
+            domain=domain, header=HEADERS)
+        writer.write(header.encode('utf-8'))
+        await writer.drain()
+        msg = await reader.read()
+        if msg.find(b"Content-Type: image")>1:
+            pl=msg.find(b"\r\n\r\n")
+            out_pics[i] = msg[pl+4:]
+        else:
+            out_pics[i] = None
+            EXIT = True
+        
+        writer.close()
+
+
+def async_getpics(urls,domain, multiple=10): # 根据urls列表下载图片数据
+    loop = asyncio.get_event_loop()     # 得到一个事件循环模型
+    minor_pics=[None for i in range(len(urls))] #预留list空间
+    tasks=[]
+    global EXIT
+    EXIT = False
+    for i in range(multiple):
+        tasks.append(async_getpic(domain,urls,minor_pics,i,multiple))
+
+    loop.run_until_complete(asyncio.wait(tasks))    # 执行任务
+    loop.close()
+    return minor_pics  # 返回图片数据
 
 
 def getpic(x1,y1,x2,y2,z,source='google',outfile="MAP_OUT.png",style='s'):
@@ -190,26 +218,29 @@ def getpic(x1,y1,x2,y2,z,source='google',outfile="MAP_OUT.png",style='s'):
     frame=getframeW(pos1x,pos1y,pos2x,pos2y,z)
     lenx = pos2x - pos1x + 1
     leny = pos2y - pos1y + 1
-    print("总数量：{x} X {y}".format(x=lenx,y=leny))
-    outpic=pil.new('RGBA',(lenx*256,leny*256))
-    datas=[]
-    for i in range(lenx):
-        datas.append([])
-        for j in range(leny):
-            print("正在下载：{0},{1}".format(i,j))
-            mapdata=getdata(pos1x+i,pos1y+j,z,source,style)
-            datas[i].append(mapdata)
+    print("瓦片总数量：{x} X {y}".format(x=lenx,y=leny))
 
-    print("下载完成！")
-    picio=None
-    print('开始拼合图像......')
-    for x,sublist in enumerate(datas):
-        for y,data in enumerate(sublist):
-            picio=io.BytesIO(data)
+    domain = getdomain(source,style)
+    urls=[geturl(source,i,j,z,style) for j in range(pos1y, pos1y + leny) for i in range(pos1x, pos1x + lenx)]
+    print("正在下载......")
+    datas = async_getpics(urls, domain)
+    
+    if EXIT:
+        print("下载出错！\n可能是缩放级别z过大，或者未连接到网络。")
+        return
+
+    print("下载完成！\n开始拼合图像......") 
+    outpic = pil.new('RGBA',(lenx*256,leny*256))
+    for i,data in enumerate(datas):
+        picio=io.BytesIO(data)
+        try:
             small_pic=pil.open(picio)
-            outpic.paste(small_pic,(x*256,y*256))
-    print('拼合完成！正在导出...')
+        except:
+            print(data)
+        y,x = i // lenx,i % lenx
+        outpic.paste(small_pic,(x*256,y*256))
 
+    print('拼合完成！\n正在导出...')
     outpic.save(outfile)
     print('导出完成！')
     return frame
@@ -223,6 +254,6 @@ def getpic_s(x,y,z,source='google',outfile="out_single.png",style="s"):
 if __name__ == '__main__':
     #下载西安 青龙寺地块 卫星地图
     mm=getpic(108.9797845,34.2356831,108.9949663,34.2275018,
-        16,source='tencent',style='s',outfile="myout.png")
+        18,source='google',style='s',outfile="myout.png")
     printzb(mm)
     
