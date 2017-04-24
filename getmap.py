@@ -5,7 +5,7 @@ Download web map by cooridinates
 
 '''
 
-#Longittude 经度
+#Longitude 经度
 #Latitude   纬度
 #Mecator x = y = [-20037508.3427892,20037508.3427892]
 #Mecator Latitue = [-85.05112877980659，85.05112877980659]
