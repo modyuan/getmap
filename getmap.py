@@ -304,10 +304,10 @@ def screen_out(zb,name):
         print("N/A")
         return
     print("坐标形式：",name)
-    print("左上：({0:.7f},{1:.7f})".format(*zb['LT']))
-    print("右上：({0:.7f},{1:.7f})".format(*zb['RT']))
-    print("左下：({0:.7f},{1:.7f})".format(*zb['LB']))
-    print("右下：({0:.7f},{1:.7f})".format(*zb['RB']))
+    print("左上：({0:.5f},{1:.5f})".format(*zb['LT']))
+    print("右上：({0:.5f},{1:.5f})".format(*zb['RT']))
+    print("左下：({0:.5f},{1:.5f})".format(*zb['LB']))
+    print("右下：({0:.5f},{1:.5f})".format(*zb['RB']))
 
 
 def file_out(zb,file,target="keep",output="file"):
@@ -336,7 +336,7 @@ def file_out(zb,file,target="keep",output="file"):
     if output=="file":
         f=open(file,"w")
         for i in ["LT","LB","RT","RB"]:
-            f.write("{0[0]}, {0[1]}, {1[0]}, {1[1]}\n".format(pixframe[i],Xframe[i]))
+            f.write("{0[0]:.5f}, {0[1].5f}, {1[0].5f}, {1[1].5f}\n".format(pixframe[i],Xframe[i]))
         f.close()
         print("Exported link file to ",file)
     else:
