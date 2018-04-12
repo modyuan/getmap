@@ -22,3 +22,19 @@
 ## 2018.04.12更新
 
 增加了Golang的版本。
+增加了Golang编译好的可执行版本。
+Usage of getmap:
+  -f string
+        输出文件名称（以.jpg结尾） (default "OUT[0412_211623].jpg")
+  -m string
+        s - 卫星图   m - 路网图 (default "s")
+  -n int
+        下载线程数 (default 10)
+  -p1 string
+        第一个对角点的经纬度，如 104.08028,30.67101 逗号前后不要加空格
+  -p2 string
+        第二个对角点的经纬度，如 104.08028,30.67101 逗号前后不要加空格
+  -s string
+        地图源(目前仅支持 google/amap/tencent) (default "google")
+  -z int
+        缩放级别，级别越大图幅越清晰。请取[1,19] (default 2)
