@@ -1,4 +1,4 @@
-# pygetmap
+# getmap
 
 请使用python 3
 
