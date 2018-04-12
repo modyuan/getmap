@@ -1,7 +1,10 @@
+//author：yuansu
+//mail: idgensou@gmail.com
 package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"image"
 	"image/draw"
@@ -11,6 +14,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"time"
 )
 
 var (
@@ -39,6 +43,12 @@ type dataplace struct {
 }
 type postion struct {
 	x, y int
+}
+
+type params struct {
+	filename, source, mode string
+	x0, y0, x1, y1         float64
+	z, n                   int
 }
 
 // 根据瓦片坐标和地图源，得到瓦片图片的请求地址
@@ -89,9 +99,7 @@ func wgs84ToTile(j, w float64, z int) (x, y int) {
 	   w : Latitude
 	   z : zoom
 	*/
-	if z < 0 || z > 20 {
-		log.Fatal("z out of the range [0,19]")
-	}
+
 	// make j to (0,1)
 	j += 180
 	j /= 360
@@ -169,12 +177,12 @@ func makeBigImg(width, height int) *image.NRGBA {
 
 //根据矩形对角的两个瓦片坐标，返回出矩形内所有的瓦片坐标,以及瓦片的横纵数量
 func makeRange(x0, y0, x1, y1 int) (r []postion, width, height int) {
-	/*if x0 > x1 {
+	if x0 > x1 {
 		x0, x1 = x1, x0
 	}
 	if y0 > y1 {
 		y0, y1 = y1, y0
-	}*/
+	}
 	height = y1 - y0 + 1
 	width = x1 - x0 + 1
 	for yt := y0; yt <= y1; yt++ {
@@ -187,6 +195,7 @@ func makeRange(x0, y0, x1, y1 int) (r []postion, width, height int) {
 
 //经度 Longitude
 //纬度 Latitude
+
 //Getmap 根据矩形对角的经纬度，下载矩形范围内所有地图，并拼合，写入f中。
 func Getmap(f *os.File, source string, maptype string, lng0, lat0, lng1, lat1 float64, z int, multi int) {
 	x0, y0 := wgs84ToTile(lng0, lat0, z)
@@ -219,9 +228,53 @@ func Getmap(f *os.File, source string, maptype string, lng0, lat0, lng1, lat1 fl
 
 }
 
+func parsecl() params {
+	var filename, source, mode, p1, p2 string
+	var zoom, n int
+	defaultname := time.Now().Format("OUT[0102_150405].jpg")
+	flag.StringVar(&filename, "f", defaultname, "输出文件名称（以.jpg结尾）")
+	flag.StringVar(&source, "s", "google", "地图源(目前仅支持 google/amap/tencent)")
+	flag.StringVar(&mode, "m", "s", "s - 卫星图   m - 路网图")
+	flag.StringVar(&p1, "p1", "", "第一个对角点的经纬度，如 104.08028,30.67101 逗号前后不要加空格")
+	flag.StringVar(&p2, "p2", "", "第二个对角点的经纬度，如 104.08028,30.67101 逗号前后不要加空格")
+	flag.IntVar(&zoom, "z", 2, "缩放级别，级别越大图幅越清晰。请取[1,19]")
+	flag.IntVar(&n, "n", 10, "下载线程数")
+	flag.Parse()
+	var x0, y0, x1, y1 float64
+	var err error
+	_, err = fmt.Sscanf(p1, "%f,%f", &x0, &y0)
+	if err != nil {
+		log.Fatal("参数p1输入错误")
+	}
+	_, err = fmt.Sscanf(p2, "%f,%f", &x1, &y1)
+	if err != nil {
+		log.Fatal("参数p2输入错误")
+	}
+	if source != "google" && source != "amap" && source != "tencent" {
+		log.Fatal("地图源设置错误！仅支持高德(amap)、谷歌(google)和腾讯(tencent)。")
+	}
+	if mode != "m" && mode != "s" {
+		log.Fatal("m地图模式设置错误！仅支持卫星图(s)和路网图(m)。")
+	}
+	if n < 1 || n > 100 {
+		n = 10
+	}
+	if zoom < 1 || zoom > 20 {
+		log.Fatal("缩放级别设置错误！请设置在[1,19]。")
+	}
+	return params{filename, source, mode, x0, y0, x1, y1, zoom, n}
+
+}
+
 func main() {
-	f, _ := os.Create("out2.jpg")
-	Getmap(f, "google", "s", 108.0, 34.2, 108.1, 34.1, 17, 10)
+	log.SetFlags(log.Ltime)
+	p := parsecl()
+
+	f, err := os.Create(p.filename)
+	if err != nil {
+		log.Fatal("创建文件失败！程序退出。")
+	}
+	Getmap(f, p.source, p.mode, p.x0, p.y0, p.x1, p.y1, p.z, p.n)
 	f.Close()
 	fmt.Println("拼合完成！")
 
