@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/draw"
 	"image/jpeg"
+	"image/png"
 	"io/ioutil"
 	"log"
 	"math"
@@ -138,9 +139,6 @@ func downloader(client *http.Client, urlc chan urlplace, datac chan dataplace, c
 			log.Fatal("download ", i, " Fail !!")
 		}
 		b, _ := ioutil.ReadAll(res.Body)
-		if string(b[1:4]) == "PNG" {
-			log.Fatal("对于给定的地图源，此区域没有网络地图信息！\n请尝试减少缩放级别或者更换地图源。")
-		}
 		monitorc <- 0
 		datac <- dataplace{b, i.x, i.y}
 	}
@@ -152,10 +150,19 @@ func merger(big *image.NRGBA, datac chan dataplace, outimgc chan *image.NRGBA) {
 	var img image.Image
 	var err error
 	for it := range datac {
-		img, err = jpeg.Decode(bytes.NewReader(it.data))
-		if err != nil {
-			fmt.Println("解析瓦片地图格式错误！")
-			log.Fatal(err.Error())
+		// tile is PNG
+		if string(it.data[1:4]) == "PNG" {
+			img, err = png.Decode(bytes.NewReader(it.data))
+			if err != nil {
+				fmt.Println("瓦片PNG解析失败！")
+				log.Fatal(err.Error())
+			}
+		} else { //tile is JPG
+			img, err = jpeg.Decode(bytes.NewReader(it.data))
+			if err != nil {
+				fmt.Println("瓦片JPG解析失败！")
+				log.Fatal(err.Error())
+			}
 		}
 		draw.Draw(big, image.Rect(it.x*256, it.y*256, it.x*256+256, it.y*256+256), img, image.Point{0, 0}, draw.Src)
 
