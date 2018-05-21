@@ -171,7 +171,7 @@ func merger(big *image.NRGBA, datac chan dataplace, outimgc chan *image.NRGBA) {
 }
 func monitor(sum int, count chan int) {
 	for i := 0; i < sum; i++ {
-		fmt.Printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b正在下载及拼合图像... [%d/%d]", i+1, sum)
+		fmt.Printf("\r正在下载及拼合图像... [%d/%d]", i+1, sum)
 		<-count
 	}
 	fmt.Println("\n下载完成。还在拼合图像...")
@@ -283,6 +283,6 @@ func main() {
 	}
 	Getmap(f, p.source, p.mode, p.x0, p.y0, p.x1, p.y1, p.z, p.n)
 	f.Close()
-	fmt.Println("拼合完成！")
+	fmt.Println("拼合完成！输出文件：" + p.filename)
 
 }
