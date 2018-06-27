@@ -251,11 +251,17 @@ func parsecl() params {
 	var err error
 	_, err = fmt.Sscanf(p1, "%f,%f", &x0, &y0)
 	if err != nil {
-		log.Fatal("参数p1输入错误")
+		log.Println("参数p1输入错误")
+		fmt.Fprintln(os.Stderr, "Usage of getmap:")
+		flag.PrintDefaults()
+		os.Exit(1)
 	}
 	_, err = fmt.Sscanf(p2, "%f,%f", &x1, &y1)
 	if err != nil {
-		log.Fatal("参数p2输入错误")
+		log.Println("参数p2输入错误")
+		fmt.Fprintln(os.Stderr, "Usage of getmap:")
+		flag.PrintDefaults()
+		os.Exit(1)
 	}
 	if source != "google" && source != "amap" && source != "tencent" {
 		log.Fatal("地图源设置错误！仅支持高德(amap)、谷歌(google)和腾讯(tencent)。")
