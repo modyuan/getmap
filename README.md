@@ -21,8 +21,8 @@
 
 ## 2018.04.12更新
 
-增加了Golang的版本。
-增加了Golang编译好的可执行版本。
+增加了Golang的版本。(golang版本暂时没有输出坐标功能)
+增加了Golang编译好的可执行版本。[Releases](https://github.com/yuansushow/getmap/releases)
 ```
 >getmap -v
 Usage of getmap:
