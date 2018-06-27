@@ -24,7 +24,7 @@
 增加了Golang的版本。(golang版本暂时没有输出坐标功能)  <br>
 增加了Golang编译好的可执行版本。下载->[Releases](https://github.com/yuansushow/getmap/releases)
 ```
->getmap -v
+>getmap -h
 Usage of getmap:
   -f string
         输出文件名称（以.jpg结尾） (default "OUT[0412_211623].jpg")
